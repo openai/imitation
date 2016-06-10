@@ -1,0 +1,101 @@
+tasks:
+  - name: hopper
+    env: Hopper-v1
+    policy: expert_policies/modern/log_Hopper-v0_3.h5/snapshots/iter0000500
+    data_subsamp_freq: 20
+    cuts_off_on_success: false
+
+  - name: walker
+    env: Walker2d-v1
+    policy: expert_policies/modern/walker_eb5b2e_1.h5/snapshots/iter0000480
+    data_subsamp_freq: 20
+    cuts_off_on_success: false
+
+  - name: ant
+    env: Ant-v1
+    policy: expert_policies/modern/log_Ant-v1_0.h5/snapshots/iter0000500
+    data_subsamp_freq: 20
+    cuts_off_on_success: false
+
+  - name: halfcheetah
+    env: HalfCheetah-v1
+    policy: expert_policies/modern/log_HalfCheetah-v0_2.h5/snapshots/iter0000500
+    data_subsamp_freq: 20
+    cuts_off_on_success: false
+
+training:
+  full_dataset_num_trajs: 50
+  dataset_num_trajs: [4, 11, 18, 25]
+  deterministic_expert: false
+  runs: 1
+
+  algorithms:
+    # Behavioral cloning
+    - name: bclone
+      cmd: >
+        python scripts/imitate_mj.py --mode bclone
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --max_iter 20001
+        --log {out}
+
+    # Generative adversarial imitation learning
+    - name: ga
+      cmd: >
+        python scripts/imitate_mj.py --mode ga
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --favor_zero_expert_reward {cuts_off_on_success}
+        --min_total_sa 50000
+        --max_iter 501
+        --reward_include_time 0
+        --reward_lr .01
+        --log {out}
+
+    # Apprenticeship learning (feature expectation matching)
+    - name: fem
+      cmd: >
+        python scripts/imitate_mj.py --mode ga
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --favor_zero_expert_reward {cuts_off_on_success}
+        --min_total_sa 50000
+        --max_iter 501
+        --reward_type l2ball
+        --reward_include_time 0
+        --log {out}
+
+    # Apprenticeship learning (finite set of adversary rewards)
+    - name: simplex # "game-theoretic" apprenticeship learning
+      cmd: >
+        python scripts/imitate_mj.py --mode ga
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --favor_zero_expert_reward {cuts_off_on_success}
+        --min_total_sa 50000
+        --max_iter 501
+        --reward_type simplex
+        --reward_include_time 0
+        --log {out}
+
+
+options:
+  storagedir: imitation_runs/modern_stochastic
+  traj_subdir: trajs
+  checkpt_subdir: checkpoints_all
+
+  eval_num_trajs: 50
+  results_filename: results.h5
+
+  pbs:
+    jobname: im_modern
+    queue: atlas
+    ppn: 12

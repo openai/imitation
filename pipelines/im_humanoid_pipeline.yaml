@@ -1,0 +1,84 @@
+tasks:
+  - name: humanoid
+    env: Humanoid-v1
+    policy: expert_policies/modern/log_humanoid_1.h5/snapshots/iter0001940
+    data_subsamp_freq: 20
+    cuts_off_on_success: false
+
+
+training:
+  full_dataset_num_trajs: 240
+  dataset_num_trajs: [80, 160, 240]
+  deterministic_expert: false
+  runs: 1
+
+  algorithms:
+    # Behavioral cloning
+    - name: bclone
+      cmd: >
+        python scripts/imitate_mj.py --mode bclone
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --max_iter 20001
+        --log {out}
+
+    # Generative adversarial imitation learning
+    - name: ga
+      cmd: >
+        python scripts/imitate_mj.py --mode ga
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --favor_zero_expert_reward {cuts_off_on_success}
+        --min_total_sa 50000
+        --max_iter 1501
+        --reward_include_time 0
+        --reward_lr .01
+        --log {out}
+
+    # Apprenticeship learning (feature expectation matching)
+    - name: fem
+      cmd: >
+        python scripts/imitate_mj.py --mode ga
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --favor_zero_expert_reward {cuts_off_on_success}
+        --min_total_sa 50000
+        --max_iter 1501
+        --reward_type l2ball
+        --reward_include_time 0
+        --log {out}
+
+    # Apprenticeship learning (finite set of adversary rewards)
+    - name: simplex # "game-theoretic" apprenticeship learning
+      cmd: >
+        python scripts/imitate_mj.py --mode ga
+        --env {env}
+        --data {dataset}
+        --limit_trajs {num_trajs}
+        --data_subsamp_freq {data_subsamp_freq}
+        --favor_zero_expert_reward {cuts_off_on_success}
+        --min_total_sa 50000
+        --max_iter 1501
+        --reward_type simplex
+        --reward_include_time 0
+        --log {out}
+
+
+options:
+  storagedir: imitation_runs/humanoid
+  traj_subdir: trajs
+  checkpt_subdir: checkpoints
+
+  eval_num_trajs: 50
+  results_filename: results.h5
+
+  pbs:
+    jobname: im_humanoid
+    queue: atlas
+    ppn: 8
